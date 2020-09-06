@@ -1,0 +1,81 @@
+#!/bin/bash
+
+die() { echo "$@" 1>&2 ; exit 1; }
+
+emcc -v &> /dev/null || die "emsdk not activated"
+
+# override gcc and g++
+mkdir -p /tmp/gcc_mocks || die "can't create tmp stuff"
+pushd /tmp/gcc_mocks > /dev/null || die "can't create tmp stuff"
+rm -f gcc g++ sdl-config
+ln -s `which emcc` gcc || die "can't mock gcc"
+ln -s `which emcc.py` gcc.py
+ln -s `which em++` g++ || die "can't mock g++"
+ln -s `which em++.py` g++.py
+
+# change to your own sdl-config path in emscripten
+ln -s /home/zeng/tools/emsdk/upstream/emscripten/system/bin/sdl-config . || die "can't mock sdl-config"
+popd > /dev/null
+
+# compile
+pushd .. > /dev/null || die ""
+# actully you will fail on the last step using bam cuz linking the linux64 library
+PATH=/tmp/gcc_mocks:$PATH emmake bam client_release -v
+# compact all llvm binary object file into once
+emcc objs/game/layers.o objs/game/collision.o objs/game/localization.o objs/game/gamecore.o objs/game/teamscore.o objs/game/generated/nethash.o objs/game/generated/protocol.o objs/game/client/gameclient.o objs/game/client/render.o objs/game/client/lineinput.o objs/game/client/ui.o objs/game/client/render_map.o objs/game/client/components/maplayers.o objs/game/client/components/effects.o objs/game/client/components/menus_browser.o objs/game/client/components/killmessages.o objs/game/client/components/race_demo.o objs/game/client/components/voting.o objs/game/client/components/spectator.o objs/game/client/components/binds.o objs/game/client/components/mapsounds.o objs/game/client/components/menus_settings.o objs/game/client/components/motd.o objs/game/client/components/particles.o objs/game/client/components/skins.o objs/game/client/components/camera.o objs/game/client/components/chat.o objs/game/client/components/items.o objs/game/client/components/emoticon.o objs/game/client/components/flow.o objs/game/client/components/debughud.o objs/game/client/components/hud.o objs/game/client/components/players.o objs/game/client/components/scoreboard.o objs/game/client/components/ghost.o objs/game/client/components/menus.o objs/game/client/components/menus_ingame.o objs/game/client/components/countryflags.o objs/game/client/components/broadcast.o objs/game/client/components/mapimages.o objs/game/client/components/console.o objs/game/client/components/damageind.o objs/game/client/components/controls.o objs/game/client/components/nameplates.o objs/game/client/components/sounds.o objs/game/client/components/menus_demo.o objs/game/client/animstate.o objs/game/generated/client_data.o objs/engine/shared/websockets.o objs/engine/shared/memheap.o objs/engine/shared/datafile.o objs/engine/shared/linereader.o objs/engine/shared/network.o objs/engine/shared/jobs.o objs/engine/shared/econ.o objs/engine/shared/engine.o objs/engine/shared/demo.o objs/engine/shared/fifoconsole.o objs/engine/shared/compression.o objs/engine/shared/filecollection.o objs/engine/shared/huffman.o objs/engine/shared/map.o objs/engine/shared/network_server.o objs/engine/shared/storage.o objs/engine/shared/ringbuffer.o objs/engine/shared/netban.o objs/engine/shared/network_conn.o objs/engine/shared/network_console_conn.o objs/engine/shared/kernel.o objs/engine/shared/config.o objs/engine/shared/mapchecker.o objs/engine/shared/console.o objs/engine/shared/serverbrowser.o objs/engine/shared/packer.o objs/engine/shared/masterserver.o objs/engine/shared/network_console.o objs/engine/shared/snapshot.o objs/engine/shared/network_client.o objs/base/confusables.o objs/base/system.o objs/engine/client/graphics_threaded.o objs/engine/client/fetcherjs.o objs/engine/client/text.o objs/engine/client/backend_sdl.o objs/engine/client/updater.o objs/engine/client/friends.o objs/engine/client/graphics.o objs/engine/client/sound.o objs/engine/client/fetcher.o objs/engine/client/client.o objs/engine/client/input.o objs/engine/client/serverbrowser.o objs/game/editor/io.o objs/game/editor/layer_game.o objs/game/editor/editor.o objs/game/editor/layer_tiles.o objs/game/editor/auto_map.o objs/game/editor/layer_quads.o objs/game/editor/popups.o objs/game/editor/layer_sounds.o objs/engine/external/zlib/gzwrite.o objs/engine/external/zlib/gzclose.o objs/engine/external/zlib/crc32.o objs/engine/external/zlib/gzlib.o objs/engine/external/zlib/zutil.o objs/engine/external/zlib/infback.o objs/engine/external/zlib/inflate.o objs/engine/external/zlib/compress.o objs/engine/external/zlib/inffast.o objs/engine/external/zlib/deflate.o objs/engine/external/zlib/adler32.o objs/engine/external/zlib/inftrees.o objs/engine/external/zlib/gzread.o objs/engine/external/zlib/trees.o objs/engine/external/zlib/uncompr.o objs/engine/external/pnglite/pnglite.o objs/engine/external/wavpack/metadata.o objs/engine/external/wavpack/unpack.o objs/engine/external/wavpack/bits.o objs/engine/external/wavpack/words.o objs/engine/external/wavpack/wputils.o objs/engine/external/wavpack/float.o objs/engine/external/json-parser/json.o objs/engine/external/md5/md5.o -v -o ddnet.o
+
+ln -fs ../ddnet.o js_build/ddnet.o || die ""
+pushd data > /dev/null || die "wheres data"
+cp ../js_build/settings.cfg .
+
+
+echo ""
+echo -e "\e[1;33m*** Make sure to apply emscripten.patch to your emscripten installation!\e[0m"
+echo -e "\e[1;33m*** It contains some fixes for emscripten bugs. We'll report and get them fixed upstream eventually.\e[0m"
+echo ""
+
+git_hash=`git log --pretty=format:'%h' -n 1`
+mkdir -p ../js_build/release || die "can't create release dir"
+rm ../js_build/release/*
+# the order of file is matter
+PRELOAD=`ls skins/*.png | sed 's/^\(.*\)$/--preload-file "\1"/g' | LC_COLLATE=C sort`
+# some library already ported by emscription, can be check by -s USE_FREETYPE=1, usage example: -s USE_FREETYPE=1
+# but some library your should compile to llvm bytecode by yourself
+# for example
+# libopus.a
+# emcmake cmake ..
+# emmake make
+# libopusfile.o
+# emcc src/*.c -I./src -I./include -I/home/zeng/open-source/ddnet-js/other/opus/include -I../opus-1.3.1/include -o libopusfile.o
+
+echo $PRELOAD | xargs emcc -v ../js_build/ddnet.o /home/zeng/open-source/opusfile-0.12/libopusfile.o /home/zeng/open-source/opus-1.3.1/.libs/libopus.a -o ../js_build/release/ddnet_$git_hash.html \
+	--js-library ../js_build/tw.js \
+	--pre-js ../js_build/pre.js \
+	--closure 1 \
+	-s ASSERTIONS=1 \
+	-s USE_FREETYPE=1 \
+	-s USE_OGG=1 \
+	-s USE_LIBPNG=1 \
+	-s "EXTRA_EXPORTED_RUNTIME_METHODS=['Pointer_stringify']" \
+	-s LLD_REPORT_UNDEFINED \
+	-s GL_FFP_ONLY=1 \
+	-s NO_EXIT_RUNTIME=1 \
+	-s DOUBLE_MODE=0 \
+	-s TOTAL_MEMORY=33554432 \
+	-s ASSERTIONS=0 \
+	-s LEGACY_GL_EMULATION=1 \
+	--preload-file fonts/DejaVuSans.ttf \
+	--preload-file settings.cfg \
+	|| die "linking error"
+rm settings.cfg
+popd > /dev/null
+popd > /dev/null
+
+sed s/GIT_HASH/$git_hash/g index.html.template > release/index.html || die "can't generate index.html"
+cp raep.js release
+
+rm -r /tmp/gcc_mocks/
+echo "********"
+echo now run
+echo python -m SimpleHTTPServer 8080
+echo and navigate to http://localhost:8080/release/index.html
